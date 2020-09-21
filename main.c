@@ -29,6 +29,9 @@ long medcount = 45;
 long largecount = 50;
 long extracount = 55;
 
+long total = 0;
+long actual = 0;
+
 
 FILE* min, *med, *large, *extra;
 
@@ -95,6 +98,7 @@ int main() {
         fgets(input,1000,stdin);
     }while (sscanf(input,"%d",&threadC)<=0);
 
+    total = (maxX-minX) * (maxZ - minZ);
 
     switch (answer) {
         case '1':{
@@ -196,8 +200,9 @@ void* countChunks(void* args){
                         ++count;
                 }
             }
+            long val = __sync_add_and_fetch(&actual,1L);
             if( count > mincount ) {
-                printf("count is %d , center chunk X= %ld Z= %ld\n", count, i, j);
+                printf("\rcount is %d , center chunk X= %ld Z= %ld\n", count, i, j);
                 fprintf(min,"%ld %ld count: %d\n",i,j,count);
             }
             if(count > medcount){
@@ -209,6 +214,8 @@ void* countChunks(void* args){
             if(count > extracount){
                 fprintf(extra,"%ld %ld count: %d\n",i,j,count);
             }
+            fprintf(stdout,"\rprogress = %.2f%% (%ld/%ld)",(val/(float)total)*100,val,total);
+            fflush(stdout);
         }
 }
 
