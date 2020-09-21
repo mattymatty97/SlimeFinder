@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <math.h>
+#include <string.h>
 char isSlimeChunk(long seed, long Xcoord, long Zcoord);
 void* findChunk(void* args);
 void* countChunks(void* args);
@@ -16,10 +18,11 @@ typedef struct {
 } myData;
 
 long seed = -9094455790421298813;
-long minX = -10000;
-long maxX = 10000;
-long minZ = -10000;
-long maxZ = 10000;
+long minX = 0;
+long maxX = 0;
+long minZ = 0;
+long maxZ = 0;
+int threadC = 8;
 
 long mincount = 30;
 long medcount = 45;
@@ -30,126 +33,148 @@ long extracount = 55;
 FILE* min, *med, *large, *extra;
 
 int main() {
-/*
-    chunks = malloc((maxX-minX)*sizeof(char*));
 
-    for(long i = 0; i<(maxX-minX); i++)
-        chunks[i] = calloc(maxZ-minZ,sizeof(char));
+    char input[1000] = {};
 
-    myData* data;
-    pthread_t threads[4] = {};
-    data = calloc(1,sizeof(myData));
-    data->minZ=minZ;
-    data->maxZ=0;
-    data->minX=minX;
-    data->maxX=0;
-    pthread_create(&threads[0],NULL,findChunk,data);
+    char answer = 'e';
 
-    data = calloc(1,sizeof(myData));
-    data->minZ=0;
-    data->maxZ=maxZ;
-    data->minX=minX;
-    data->maxX=0;
-    pthread_create(&threads[1],NULL,findChunk,data);
+    fprintf(stdout,"What do you wanna calculate?\n\r"
+                   "1) chunk grid\n\r"
+                   "2) chunk count\n\r"
+                   "e) exit\n\r");
 
-    data = calloc(1,sizeof(myData));
-    data->minZ=minZ;
-    data->maxZ=0;
-    data->minX=0;
-    data->maxX=maxX;
-    pthread_create(&threads[2],NULL,findChunk,data);
+    do{
+        fprintf(stdout,"> ");
+        fgets(input,1000,stdin);
+        sscanf(input,"%c",&answer);
+    }while (answer!='1' && answer!='2' && answer!='e');
 
-    data = calloc(1,sizeof(myData));
-    data->minZ=0;
-    data->maxZ=maxZ;
-    data->minX=0;
-    data->maxX=maxX;
-    pthread_create(&threads[3],NULL,findChunk,data);
+    if(answer=='e')
+        return 0;
 
-    pthread_join(threads[0],NULL);
-    pthread_join(threads[1],NULL);
-    pthread_join(threads[2],NULL);
-    pthread_join(threads[3],NULL);
 
-    FILE* file = fopen("./tmp.txt","w+");
-    if(file==NULL){
-        perror("error:");
-        return 1;
+    fprintf(stdout,"what's the world seed ?\n\r");
+
+    do{
+        fprintf(stdout,"> ");
+        fgets(input,1000,stdin);
+    }while (sscanf(input,"%ld",&seed)<=0);
+
+    fprintf(stdout,"what's the minimum X ?\n\r");
+
+    do{
+        fprintf(stdout,"> ");
+        fgets(input,1000,stdin);
+    }while (sscanf(input,"%ld",&minX)<=0);
+
+    fprintf(stdout,"what's the maximum X ?\n\r");
+
+    do{
+        fprintf(stdout,"> ");
+        fgets(input,1000,stdin);
+    }while (sscanf(input,"%ld",&maxX)<=0);
+
+    fprintf(stdout,"what's the minimum Z ?\n\r");
+
+    do{
+        fprintf(stdout,"> ");
+        fgets(input,1000,stdin);
+    }while (sscanf(input,"%ld",&minZ)<=0);
+
+    fprintf(stdout,"what's the maximum Z ?\n\r");
+
+    do{
+        fprintf(stdout,"> ");
+        fgets(input,1000,stdin);
+    }while (sscanf(input,"%ld",&maxZ)<=0);
+
+    fprintf(stdout,"how many threads to start?\n\r");
+
+    do{
+        fprintf(stdout,"> ");
+        fgets(input,1000,stdin);
+    }while (sscanf(input,"%d",&threadC)<=0);
+
+
+    switch (answer) {
+        case '1':{
+            chunks = malloc((maxX-minX)*sizeof(char*));
+
+            for(long i = 0; i<(maxX-minX); i++)
+                chunks[i] = calloc(maxZ-minZ,sizeof(char));
+
+            pthread_t* threads;
+
+            threads = calloc(threadC,sizeof(pthread_t));
+
+            myData* data;
+            for(int i=0 ; i<threadC; i++){
+                data = calloc(1,sizeof(myData));
+                data->minZ=minZ;
+                data->maxZ=maxZ;
+                data->minX=minX + i*(maxX-minX)/threadC;
+                data->maxX=minX + (i+1)*(maxX-minX)/threadC + 1;
+                pthread_create(&threads[i],NULL,findChunk,data);
+            }
+
+            for(int i=0 ; i<threadC; i++)
+                pthread_join(threads[i],NULL);
+
+            FILE* file = fopen("./tmp.txt","w+");
+            if(file==NULL){
+                perror("error:");
+                return 1;
+            }
+
+            for(long i = 0; i<(maxX-minX); i++) {
+                for (long j = 0; j < (maxZ - minZ); j++)
+                    fprintf(file, "%c", (chunks[i][j]) ? 'X' : ' ');
+                fprintf(file,"\n");
+            }
+            fclose(file);
+        }
+            break;
+        case '2':
+        {
+            min = fopen("./min.txt","w+");
+            med = fopen("./med.txt","w+");
+            large = fopen("./large.txt","w+");
+            extra = fopen("./extra.txt","w+");
+
+            pthread_t* threads;
+
+            threads = calloc(threadC,sizeof(pthread_t));
+
+            myData* data;
+            for(int i=0 ; i<threadC; i++){
+                data = calloc(1,sizeof(myData));
+                data->minX=minX + i*(maxX-minX)/threadC;
+                data->maxX=minX + (i+1)*(maxX-minX)/threadC;
+                pthread_create(&threads[i],NULL,countChunks,data);
+            }
+
+            for(int i=0 ; i<threadC; i++)
+                pthread_join(threads[i],NULL);
+
+            fclose(min);
+            fclose(med);
+            fclose(large);
+            fclose(extra);
+        }
+            break;
+
     }
 
-    for(long i = 0; i<(maxX-minX); i++) {
-        for (long j = 0; j < (maxZ - minZ); j++)
-            fprintf(file, "%c", (chunks[i][j]) ? 'X' : ' ');
-        fprintf(file,"\n");
-    }
-
-*/
-
-    min = fopen("./min.txt","w+");
-    med = fopen("./med.txt","w+");
-    large = fopen("./large.txt","w+");
-    extra = fopen("./extra.txt","w+");
 
 
-    myData* data;
-    pthread_t threads[8] = {};
 
-    data = calloc(1,sizeof(myData));
-    data->minX=minX;
-    data->maxX=minX + (maxX-minX)/8;
-    pthread_create(&threads[0],NULL,countChunks,data);
-
-    data = calloc(1,sizeof(myData));
-    data->minX=minX + ((maxX-minX)/8) +1;
-    data->maxX=minX + 2*((maxX-minX)/8);
-    pthread_create(&threads[1],NULL,countChunks,data);
-
-    data = calloc(1,sizeof(myData));
-    data->minX=minX + 2*((maxX-minX)/8) +1;
-    data->maxX=minX + 3*((maxX-minX)/8);
-    pthread_create(&threads[2],NULL,countChunks,data);
-
-    data = calloc(1,sizeof(myData));
-    data->minX=minX + 3*((maxX-minX)/8) +1;
-    data->maxX=minX + 4*((maxX-minX)/8);
-    pthread_create(&threads[3],NULL,countChunks,data);
-
-    data = calloc(1,sizeof(myData));
-    data->minX=minX + 4*((maxX-minX)/8) +1;
-    data->maxX=minX + 5*((maxX-minX)/8);
-    pthread_create(&threads[4],NULL,countChunks,data);
-
-    data = calloc(1,sizeof(myData));
-    data->minX=minX + 5*((maxX-minX)/8) +1;
-    data->maxX=minX + 6*((maxX-minX)/8);
-    pthread_create(&threads[5],NULL,countChunks,data);
-
-    data = calloc(1,sizeof(myData));
-    data->minX=minX + 6*((maxX-minX)/8) +1;
-    data->maxX=minX + 7*((maxX-minX)/8);
-    pthread_create(&threads[6],NULL,countChunks,data);
-
-    data = calloc(1,sizeof(myData));
-    data->minX=minX + 7*((maxX-minX)/8) +1;
-    data->maxX=maxX;
-    pthread_create(&threads[7],NULL,countChunks,data);
-
-
-    pthread_join(threads[0],NULL);
-    pthread_join(threads[1],NULL);
-    pthread_join(threads[2],NULL);
-    pthread_join(threads[3],NULL);
-    pthread_join(threads[4],NULL);
-    pthread_join(threads[5],NULL);
-    pthread_join(threads[6],NULL);
-    pthread_join(threads[7],NULL);
 
     return 0;
 }
 
 void* findChunk(void* args){
     myData* data = args;
-    printf(" generating - minx: %ld maxX: %ld minZ %ld maxZ: %ld\n",data->minX,data->maxX,data->minZ,data->maxZ);
+    printf(" generating - x= [ %ld, %ld ] z= [ %ld , %ld]\n",data->minX,data->maxX,data->minZ,data->maxZ);
     for(long i=data->minX;i<data->maxX;i++)
         for(int j = data->minZ; j<data->maxZ; j++)
             chunks[i-minX][j-minZ]=isSlimeChunk(seed,i,j);
@@ -158,15 +183,16 @@ void* findChunk(void* args){
 
 void* countChunks(void* args){
     myData* data = args;
-    printf("searching - minx: %ld maxX: %ld minZ %ld maxZ: %ld\n",data->minX,data->maxX,data->minZ,data->maxZ);
+    printf("searching - x= [ %ld, %ld ] z= [ %ld , %ld]\n",data->minX,data->maxX,data->minZ,data->maxZ);
     int count = 0;
     for(long i=data->minX; i<data->maxX; i++)
         for(long j = minZ; j < maxZ; j++)
         {
             count = 0;
-            for (long k = i-8 ; k < i+8 ; ++k) {
-                for (long l = j-8 ; l < j+8 ; ++l) {
-                    if(isSlimeChunk(seed,k,l))
+            for (int dx = -8 ; dx <= 8; dx++){
+                int delta = (int) sqrt(8 * 8 - dx * dx);
+                for (int dz = -delta ; dz <= delta; dz++){
+                    if(isSlimeChunk(seed, i + dx, j + dz))
                         ++count;
                 }
             }
