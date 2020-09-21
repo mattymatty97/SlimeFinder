@@ -162,12 +162,12 @@ int main() {
         strcpy(input, ".");
 
         fprintf(stdout, "> ");
-        fgets(input, 1000, stdin);
+        if(fgets(input, 1000, stdin)>0)
+            strncpy(savepath, input,strlen(input)-1);
         fflush(stdin);
 
         struct stat st = {0};
 
-        strncpy(savepath, input,strlen(input)-1);
 
         if (stat(savepath, &st) == -1) {
             if (mkdir(savepath, 0700) != 0) {
@@ -289,6 +289,8 @@ int main() {
                 fgets(input,1000,resume);
                 sscanf(input, "count= %ld\n", &old);
                 __sync_fetch_and_add(&actual,old);
+                fclose(resume);
+                resume=NULL;
             }
 
             for(int i=0 ; i<threadC; i++)
